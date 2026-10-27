@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#153c36">
+    <meta name="description" content="Split grocery receipts fairly with item-level tax and local receipt scanning.">
+    <title>Sharecart · Grocery bill splitter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">S</span><span>Sharecart</span></div>
+        <span class="header-note">Your receipt stays in your browser</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Grocery bill splitter</p>
+          <h1 id="page-title">One receipt.<br><em>Everyone’s fair share.</em></h1>
+          <p class="hero-copy">Scan a receipt, check the items, and choose who shares each one. Tax applies only where you say it does.</p>
+        </div>
+        <div class="hero-number" aria-hidden="true"><span>01</span><span class="hero-line"></span><span>02</span><span class="hero-line"></span><span>03</span><small>scan&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;review&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;split</small></div>
+      </section>
+
+      <div class="layout">
+        <div class="main-column">
+          <section class="panel upload-panel" aria-labelledby="receipt-heading">
+            <div class="section-heading"><div><p class="section-kicker">Step 01</p><h2 id="receipt-heading">Bring in a receipt</h2></div><span class="step-icon" aria-hidden="true">↗</span></div>
+            <label class="drop-zone" id="drop-zone">
+              <input id="receipt-file" type="file" accept="image/*,.pdf,application/pdf" multiple>
+              <span class="upload-icon" aria-hidden="true">＋</span>
+              <strong>Tap to choose photos or PDFs</strong>
+              <span>or drop them here · supports multiple files</span>
+            </label>
+            <p class="fine-print">Text PDFs are read directly. Photos and scanned PDFs use on-device OCR. Please check every extracted item and price.</p>
+            <p id="scan-status" class="status" role="status" aria-live="polite"></p>
+            <details id="receipt-text-section" hidden><summary>Review extracted receipt text</summary><label for="receipt-text">Correct any text, then scan it again</label><textarea id="receipt-text" rows="9" spellcheck="false"></textarea><button class="button button-secondary" id="reparse-text" type="button">Scan corrected text</button></details>
+          </section>
+
+          <section class="panel people-panel" aria-labelledby="people-heading">
+            <div class="section-heading"><div><p class="section-kicker">Step 02</p><h2 id="people-heading">Who’s splitting?</h2></div><span id="people-count" class="count-pill">0 people</span></div>
+            <div id="people-list" class="people-list"></div>
+            <form id="add-person-form" class="add-row"><label class="sr-only" for="person-name">Person’s name</label><input id="person-name" type="text" maxlength="32" placeholder="Add someone’s name" required><button class="button button-secondary" type="submit">Add person</button></form>
+          </section>
+
+          <section class="panel items-panel" aria-labelledby="items-heading">
+            <div class="section-heading"><div><p class="section-kicker">Step 03</p><h2 id="items-heading">Review the items</h2><p class="heading-help">Edit the scan, choose sharers, and mark only taxable items.</p></div><span id="items-count" class="count-pill">0 items</span></div>
+            <div id="items-list" class="items-list"></div>
+            <button id="add-item" class="button button-add" type="button">＋ Add an item manually</button>
+          </section>
+        </div>
+
+        <aside class="side-column" aria-label="Bill settings and totals">
+          <section class="panel settings-panel" aria-labelledby="settings-heading">
+            <p class="section-kicker">Bill settings</p><h2 id="settings-heading">The details</h2>
+            <label class="field-label" for="tax-rate">Tax rate <span>editable</span></label>
+            <div class="percent-input"><input id="tax-rate" type="number" min="0" max="100" step="0.01" inputmode="decimal"><span>%</span></div>
+            <label class="switch-row"><span><strong>Apply tax</strong><small>Only to items marked taxable</small></span><input id="tax-enabled" type="checkbox" role="switch"><span class="switch" aria-hidden="true"></span></label>
+            <div class="setting-divider"></div>
+            <p class="field-label">Discounts <span>on item prices</span></p>
+            <label class="switch-row"><span><strong>10% discount</strong><small>Applied before tax</small></span><input id="discount-10" type="checkbox" role="switch"><span class="switch" aria-hidden="true"></span></label>
+            <label class="switch-row"><span><strong>20% discount</strong><small>Combined with the 10% discount</small></span><input id="discount-20" type="checkbox" role="switch"><span class="switch" aria-hidden="true"></span></label>
+            <p class="fine-print">When both discounts are on, they combine for 30% off, matching the spreadsheet. Tax is then calculated on discounted taxable items.</p>
+          </section>
+
+          <section class="totals-panel" aria-labelledby="totals-heading">
+            <p class="section-kicker">At a glance</p><h2 id="totals-heading">What everyone owes</h2>
+            <div id="split-warning" class="split-warning" hidden></div>
+            <div id="person-totals" class="person-totals"></div>
+            <div class="totals-divider"></div>
+            <div class="total-line"><span>Items</span><strong id="subtotal">$0.00</strong></div>
+            <div class="total-line"><span>Discounts</span><strong id="discount-total">−$0.00</strong></div>
+            <div class="total-line"><span>Tax</span><strong id="tax-total">$0.00</strong></div>
+            <div class="grand-total"><span>Assigned total</span><strong id="grand-total">$0.00</strong></div>
+            <p class="fine-print light-print">Totals include assigned items only. Each cent is allocated to a selected sharer.</p>
+          </section>
+          <button id="reset-bill" class="reset-button" type="button">Start a fresh bill</button>
+        </aside>
+      </div>
+      <footer><span>Sharecart</span><span>Private by design · No account or API key</span></footer>
+    </main>
+  </body>
+</html>
